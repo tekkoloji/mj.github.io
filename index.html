@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destek Takip</title>
+    <!-- Vue.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <style>
+        body {
+            background-color: #f0e400; /* Sarı arka plan */
+            font-family: Arial, sans-serif;
+        }
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #000000;
+        }
+        .input-container {
+            display: flex;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .input-container input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .input-container button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #000000;
+            color: #f0e400;
+            cursor: pointer;
+        }
+        .input-container button:hover {
+            background-color: #333333;
+        }
+        .email-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 12px;
+            background-color: #000000;
+            color: #f0e400;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .email-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #000000;
+            margin-bottom: 20px;
+        }
+        .status-badges {
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .status-badge.not-done {
+            background-color: #d9534f; /* Kırmızı */
+            color: #ffffff; /* Beyaz yazı rengi */
+        }
+        .status-badge.solved {
+            background-color: #5cb85c; /* Yeşil */
+            color: #ffffff; /* Beyaz yazı rengi */
+        }
+        .status-badge.in-progress {
+            background-color: #f0ad4e; /* Turuncu */
+            color: #000000; /* Siyah yazı rengi */
+        }
+        .status-badge.under-review {
+            background-color: #5bc0de; /* Mavi */
+            color: #ffffff; /* Beyaz yazı rengi */
+        }
+        .status-badge.evaluating {
+            background-color: #f0e400; /* Sarı */
+            color: #000000; /* Siyah yazı rengi */
+        }
+        .response-list {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .response-list th, .response-list td {
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            color: #000000;
+        }
+        .response-list th {
+            background-color: #000000;
+            color: #f0e400;
+            text-align: left;
+        }
+        .response-list tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+        .response-list tr:nth-child(even) {
+            background-color: #e9e9e9;
+        }
+        .no-data-message {
+            font-size: 16px;
+            font-weight: bold;
+            color: #d9534f; /* Kırmızı */
+            text-align: center;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            #app {
+                padding: 10px;
+            }
+            .input-container {
+                flex-direction: column;
+            }
+            .input-container button {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>Maxijett Destek Takip</h1>
+        <div class="input-container">
+            <input v-model="email" type="email" placeholder="Mail adresinizi buraya yazın">
+            <button @click="sendRequest">Sorgula</button>
+        </div>
+        <div v-if="showEmailTitle" class="email-title">
+            <span>Şu mail adresi için gönderilen talepler:</span>
+            <div class="email-badge">{{ email }}</div>
+        </div>
+        <div v-if="Object.keys(statusCounts).length" class="status-badges">
+            <div v-for="(count, status) in statusCounts" :key="status" class="status-badge" :class="statusClass(status)">
+                {{ status }} ({{ count }})
+            </div>
+        </div>
+        <table class="response-list" v-if="responseData.length">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Ad</th>
+                    <th>Tür</th>
+                    <th>Durum</th>
+                    <th>Detay</th>
+                    <th>Yorum</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="(item, index) in sortedResponseData" :key="index">
+                    <td>{{ formatDate(item.dateTime) }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.type }}</td>
+                    <td>{{ item.status }}</td>
+                    <td>{{ item.detail }}</td>
+                    <td>{{ item.comment || '-' }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <div v-else-if="noDataMessage" class="no-data-message">{{ noDataMessage }}</div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                email: '',
+                responseData: [],
+                showEmailTitle: false,
+                noDataMessage: '',
+                statusCounts: {}
+            },
+            computed: {
+                sortedResponseData() {
+                    return this.responseData.slice().sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+                }
+            },
+            methods: {
+                sendRequest() {
+                    if (this.email) {
+                        this.fetchData(this.email).then(response => {
+                            this.responseData = response;
+                            this.showEmailTitle = true;
+                            this.statusCounts = this.calculateStatusCounts();
+                            if (this.responseData.length === 0) {
+                                this.noDataMessage = 'Bu mail adresine ait destek talebi bulunamadı.';
+                            } else {
+                                this.noDataMessage = '';
+                            }
+                        });
+                    } else {
+                        alert('Lütfen geçerli bir email adresi girin.');
+                    }
+                },
+                fetchData(email) {
+                    const url = `https://script.google.com/macros/s/AKfycbxrrxrddlQy4C4oVaRe_83gM5nAoabVtqLZ9CEJborK3UMAYVL3507h5UZmIDRe95pi/exec?mail=${email}`;
+                    return fetch(url)
+                        .then(response => response.json())
+                        .then(data => data || []);
+                },
+                calculateStatusCounts() {
+                    return this.responseData.reduce((acc, item) => {
+                        acc[item.status] = (acc[item.status] || 0) + 1;
+                        return acc;
+                    }, {});
+                },
+                statusClass(status) {
+                    switch (status) {
+                        case 'YAPILMAYACAK':
+                            return 'not-done';
+                        case 'ÇÖZÜLDÜ':
+                            return 'solved';
+                        case 'ARAŞTIRILIYOR':
+                            return 'in-progress';
+                        case 'DEĞERLENDİRİLECEK':
+                            return 'under-review';
+                        case 'İŞLEMDE':
+                            return 'evaluating';
+                        default:
+                            return '';
+                    }
+                },
+                formatDate(dateTime) {
+                    const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' };
+                    return new Date(dateTime).toLocaleString('tr-TR', options);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
